@@ -32,7 +32,7 @@ const createPollAndOptions = async () => {
         console.log(pollId); // Use pollId variable
 
         // Create poll options using the retrieved pollId
-        const { error: optionsError } = await supabase.from("options").insert([
+        const { error: optionsError } = await supabase.from("poll_options").insert([
             {
                 poll_id: pollId, // Use the pollId from the created poll
                 option_1: options.value[0],
