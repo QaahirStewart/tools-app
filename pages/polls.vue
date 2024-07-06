@@ -1,6 +1,9 @@
 <script setup>
 const supabase = useSupabaseClient();
 
+const route = useRoute()
+const currentId = route.params.id;
+
 const { data: pollData } = await useAsyncData("pollData", async () => {
     const { data } = await supabase
         .from("polls")

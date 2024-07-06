@@ -4,8 +4,6 @@ const supabase = useSupabaseClient();
 
 const question = ref("");
 
-
-
 // Initialize options with a default number of options, e.g., 2 options
 const options = ref(["", ""]);
 
@@ -35,12 +33,7 @@ const createPollAndOptions = async () => {
         const { error: optionsError } = await supabase.from("poll_options").insert([
             {
                 poll_id: pollId, // Use the pollId from the created poll
-                option_1: options.value[0],
-                option_2: options.value[1],
-                option_3: options.value[2],
-                option_4: options.value[3],
-                option_5: options.value[4],
-                option_6: options.value[5],
+                options: options.value,
             },
         ]);
 
