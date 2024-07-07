@@ -126,13 +126,18 @@ const submitVote = async () => {
   }
 };
 
+const pollQuestion = computed(() => poll.value.question);
+
+
 const highestVotedOption = computed(() => {
   if (!PollData.value || PollData.value.length === 0) {
-    return null;
+    return "No Votes";
   }
-  return PollData.value.reduce((highest, current) => {
+  const result = PollData.value.reduce((highest, current) => {
     return (highest.voteCount > current.voteCount) ? highest : current;
-  }).option;
+  }, { voteCount: 0 }); // Use initial value { voteCount: 0 }
+
+  return result.voteCount > 0 ? result.option : "-";
 });
 
 // Calculate the top viewing platform
@@ -140,24 +145,24 @@ const topViewingPlatform = computed(() => {
   const platformCounts = rawVoteData.value.reduce((acc, vote) => {
     acc[vote.viewing_platform] = (acc[vote.viewing_platform] || 0) + 1;
     return acc;
-  }, {});
-  return Object.entries(platformCounts).reduce((a, b) => (a[1] > b[1] ? a : b))[0];
+  }, {}); // Initial value is already an empty object, which is correct.
+  return Object.entries(platformCounts).reduce((a, b) => (a[1] > b[1] ? a : b), ['', 0])[0]; // Added initial value ['', 0] for safety.
 });
 </script>
 
 <template>
-  <div class="container mx-auto  overflow-auto ">
+  <div class="container mx-auto overflow-auto">
     <div class="flex justify-evenly h-screen flex-col ">
       <!-- Poll Section -->
 
       <div class="flex flex-col max-w-xl w-full space-y-4 mx-auto">
         <NuxtLink to="/polls" class="flex my-4 items-end space-x-5">
           <Icon name="fa6-solid:square-poll-vertical" size="60" />
-          <h1 class="text-7xl font-bold text-center">Poll</h1>
+          <h1 class="text-7xl font-bold text-center">Poll{{ }}</h1>
         </NuxtLink>
 
         <div class="flex justify-between">
-          <h1 class="text-lg text-md font-bold">{{ poll.question }}</h1>
+          <h1 class="text-lg text-md font-bold">{{ pollQuestion }}</h1>
           <p>{{ pollDate }}</p>
         </div>
 

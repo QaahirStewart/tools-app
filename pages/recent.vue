@@ -1,85 +1,38 @@
 <script setup>
-// const { data: polls } = useFetch('/api/polls');
+const countdown = ref('');
+const futureDate = new Date('2024-07-31'); // Set your future date here
 
-const supabase = useSupabaseClient();
+const updateCountdown = () => {
+    const now = new Date();
+    const difference = futureDate - now;
 
-const { data: poll, refresh } = useFetch("/api/polls", {
-    transform: async (response) => {
-        return response.polls.find(poll => poll.id === 2);
-    },
-});
-
-// Fetch vote data
-const { data: rawVoteData, refresh: refreshVotes } = await useAsyncData("voteData", async () => {
-    const { data } = await supabase
-        .from("poll_votes")
-        .select('*')
-        .eq("poll_id", 2);
-    return data;
-});
-
-// Transform vote data to group by option_voted, count each, and calculate percentages
-const voteData = computed(() => {
-    const groupedVotes = rawVoteData.value.reduce((acc, vote) => {
-        if (acc[vote.option_voted]) {
-            acc[vote.option_voted]++;
-        } else {
-            acc[vote.option_voted] = 1;
-        }
-        return acc;
-    }, {});
-
-    const totalVotes = Object.values(groupedVotes).reduce((sum, count) => sum + count, 0);
-
-    return Object.entries(groupedVotes).map(([option, count]) => ({
-        option_voted: option,
-        count,
-        percentage: totalVotes > 0 ? ((count / totalVotes) * 100).toFixed(0) + '%' : '0%'
-    }));
-});
-
-// Merge poll data and voteData
-const mergedData = computed(() => {
-    if (!poll.value || !voteData.value) {
-        return [];
+    if (difference <= 0) {
+        countdown.value = 'Time is up!';
+        return;
     }
 
-    return poll.value.options.map(optionText => {
-        const voteInfo = voteData.value.find(vote => vote.option_voted === optionText) || { count: 0, percentage: '0%' };
-        return {
-            option: optionText,
-            voteCount: voteInfo.count,
-            votePercentage: voteInfo.percentage
-        };
-    });
+    const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+    countdown.value = `${days}d ${hours}h ${minutes}m ${seconds}s`;
+};
+
+let intervalId;
+
+onMounted(() => {
+    updateCountdown(); // Update immediately on mount
+    intervalId = setInterval(updateCountdown, 1000); // Then update every second
 });
 
-// Calculate the highest voted option
-const highestVotedOption = computed(() => {
-    if (!mergedData.value || mergedData.value.length === 0) {
-        return null;
-    }
-    return mergedData.value.reduce((highest, current) => {
-        return (highest.voteCount > current.voteCount) ? highest : current;
-    }).option;
-});
-// Calculate the top viewing platform
-const topViewingPlatform = computed(() => {
-    const platformCounts = rawVoteData.value.reduce((acc, vote) => {
-        acc[vote.viewing_platform] = (acc[vote.viewing_platform] || 0) + 1;
-        return acc;
-    }, {});
-    return Object.entries(platformCounts).reduce((a, b) => (a[1] > b[1] ? a : b))[0];
+onUnmounted(() => {
+    clearInterval(intervalId); // Clear the interval when the component is unmounted
 });
 </script>
 
 <template>
-    <div>
-        <p>
-
-            {{ highestVotedOption }}
-
-
-        </p>
-    </div>
+    <div>{{ countdown }}</div>
 </template>
+
+<style scoped></style>
