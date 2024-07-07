@@ -2,18 +2,23 @@
 
 const supabase = useSupabaseClient();
 
-const { data: pollData } = await useAsyncData("pollData", async () => {
+const currentId = 2;
+
+const { data: voteData } = await useAsyncData("voteData", async () => {
     const { data } = await supabase
-        .from("polls")
-        .select("*")
+        .from("poll_votes")
+        .select('*')
+        .eq("poll_id", currentId);
     return data;
+});
+
+const totalVotes = computed(() => {
+    return voteData.value.length;
 });
 </script>
 
 <template>
     <div>
-        <ul>
-            <li v-for="(value, key) in pollData" :key="key">{{ key }}: {{ value }}</li>
-        </ul>
+        {{ totalVotes }}
     </div>
 </template>
