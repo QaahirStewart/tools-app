@@ -1,19 +1,4 @@
 <script setup>
-// import { RealtimeChannel } from "@supabase/supabase-js";
-
-// let realtimeChannel = RealtimeChannel;
-
-// onMounted(() => {
-//   realtimeChannel = supabase
-//     .channel("public:poll_votes")
-//     .on(
-//       "postgres_changes",
-//       { event: "*", schema: "public", table: "poll_votes" },
-//       () => refreshVotes(),
-//     );
-//   realtimeChannel.subscribe();
-// });
-
 const supabase = useSupabaseClient();
 
 const route = useRoute();
@@ -109,11 +94,11 @@ const selectedOption = ref(null);
 const selectedPlatform = ref(null);
 
 const platforms = [
-  { name: "Youtube", icon: "simple-icons:youtube" },
-  { name: "Rumble", icon: "simple-icons:rumble" },
-  { name: "Facebook", icon: "simple-icons:facebook" },
+  { name: "Youtube", icon: "logos:youtube-icon" },
+  { name: "Rumble", icon: "simple-icons:rumble", color: "red" },
+  { name: "Facebook", icon: "logos:facebook" },
   { name: "Twitter", icon: "simple-icons:x" },
-  { name: "Twitch", icon: "simple-icons:twitch" },
+  { name: "Twitch", icon: "logos:twitch" },
 ];
 
 const isVoteEnabled = computed(
@@ -140,6 +125,24 @@ const submitVote = async () => {
     selectedPlatform.value = null;
   }
 };
+
+const highestVotedOption = computed(() => {
+  if (!PollData.value || PollData.value.length === 0) {
+    return null;
+  }
+  return PollData.value.reduce((highest, current) => {
+    return (highest.voteCount > current.voteCount) ? highest : current;
+  }).option;
+});
+
+// Calculate the top viewing platform
+const topViewingPlatform = computed(() => {
+  const platformCounts = rawVoteData.value.reduce((acc, vote) => {
+    acc[vote.viewing_platform] = (acc[vote.viewing_platform] || 0) + 1;
+    return acc;
+  }, {});
+  return Object.entries(platformCounts).reduce((a, b) => (a[1] > b[1] ? a : b))[0];
+});
 </script>
 
 <template>
@@ -180,12 +183,12 @@ const submitVote = async () => {
         <div class="flex sm:flex-row flex-col justify-between items-center sm:space-y-0 space-y-4 sm:py-0 py-4">
           <h2 class="text-lg font-bold">Viewing Platform:</h2>
           <div class="flex flex-wrap space-x-4">
-            <button v-for="(platform, index) in platforms" :key="index" @click="selectedPlatform = platform.name"
+            <button v-for="(platform, index) in    platforms   " :key="index" @click="selectedPlatform = platform.name"
               :class="{
             selectedViewingPlatform: selectedPlatform === platform.name,
           }"
               class="bg-black/5 hover:bg-black/10  sm:size-14 size-12 rounded-lg flex items-center justify-center space-x-2">
-              <Icon :name="platform.icon" size="24" />
+              <Icon :name="platform.icon" size="24" :class="{ rumbleIconColor: platform.name === 'Rumble' }" />
             </button>
           </div>
         </div>
@@ -205,16 +208,17 @@ const submitVote = async () => {
               <p class="font-bold">Total Votes:&nbsp;{{ totalVotes }}</p>
             </div>
             <div class="space-y-2">
-              <div class="flex items-center space-x-4 p-3 bg-black/5 rounded-lg">
-                <Icon name="fa6-solid:trophy" size="30" class="text-yellow-400" />
+              <div class="flex items-center space-x-4 h-14 px-4 bg-black/5 rounded-lg">
+                <Icon name="fa6-solid:trophy" size="24" class="text-yellow-400" />
                 <div class="flex">
                   <p class="font-bold">Most Voted:&nbsp;</p>
-                  <p>BMW</p>
+                  <p>{{ highestVotedOption }}</p>
                 </div>
               </div>
 
-              <div class="flex items-center space-x-4 p-3 bg-black/5 rounded-lg">
-                <Icon name="simple-icons:twitch" size="30" class="text-yellow-400" />
+              <div class="flex items-center space-x-4 h-14 px-4 bg-black/5 rounded-lg">
+                <Icon :name="topViewingPlatform" size="24"
+                  :class="{ rumbleIconColor: topViewingPlatform === 'Rumble' }" />
 
                 <p class="font-bold">Top Viewing Platform</p>
               </div>
@@ -232,6 +236,14 @@ const submitVote = async () => {
 <style scoped>
 .selectedPollOption {
   background-color: rgb(34 197 94 / 0.75);
+}
+
+.rumbleIconColor {
+  color: #85C742;
+}
+
+.TwitterIconColor {
+  color: black;
 }
 
 .selectedViewingPlatform {

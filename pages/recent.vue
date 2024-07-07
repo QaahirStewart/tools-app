@@ -53,12 +53,31 @@ const mergedData = computed(() => {
         };
     });
 });
+
+// Calculate the highest voted option
+const highestVotedOption = computed(() => {
+    if (!mergedData.value || mergedData.value.length === 0) {
+        return null;
+    }
+    return mergedData.value.reduce((highest, current) => {
+        return (highest.voteCount > current.voteCount) ? highest : current;
+    }).option;
+});
+// Calculate the top viewing platform
+const topViewingPlatform = computed(() => {
+    const platformCounts = rawVoteData.value.reduce((acc, vote) => {
+        acc[vote.viewing_platform] = (acc[vote.viewing_platform] || 0) + 1;
+        return acc;
+    }, {});
+    return Object.entries(platformCounts).reduce((a, b) => (a[1] > b[1] ? a : b))[0];
+});
 </script>
 
 <template>
     <div>
         <p>
-            {{ mergedData }}
+
+            {{ highestVotedOption }}
 
 
         </p>
