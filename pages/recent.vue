@@ -1,38 +1,62 @@
-<script setup>
-const countdown = ref('');
-const futureDate = new Date('2024-07-31'); // Set your future date here
+<script setup lang="ts">
+import { ref } from 'vue'
+import {
+    DateFormatter,
+    type DateValue,
+    getLocalTimeZone,
+    today,
+} from '@internationalized/date'
 
-const updateCountdown = () => {
-    const now = new Date();
-    const difference = futureDate - now;
+import { Calendar as CalendarIcon } from 'lucide-vue-next'
 
-    if (difference <= 0) {
-        countdown.value = 'Time is up!';
-        return;
-    }
+import { cn } from '@/lib/utils'
 
-    const days = Math.floor(difference / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+const df = new DateFormatter('en-US', {
+    dateStyle: 'long',
+})
 
-    countdown.value = `${days}d ${hours}h ${minutes}m ${seconds}s`;
-};
+const items = [
+    { value: 0, label: 'Today' },
+    { value: 0.02083, label: 'In 30 mins' }, // Added "In 30 mins"
+    { value: 0.04167, label: 'In 1 hour' }, // Added "In 1 hour"
+    { value: 1, label: 'Tomorrow' },
+    { value: 3, label: 'In 3 days' },
+    { value: 7, label: 'In a week' },
+]
 
-let intervalId;
+const endDate = ref<DateValue>()
+const { countdown } = useDateCountdown(endDate.value);
 
-onMounted(() => {
-    updateCountdown(); // Update immediately on mount
-    intervalId = setInterval(updateCountdown, 1000); // Then update every second
-});
-
-onUnmounted(() => {
-    clearInterval(intervalId); // Clear the interval when the component is unmounted
-});
 </script>
 
 <template>
-    <div>{{ countdown }}</div>
-</template>
+    <Popover>
+        <PopoverTrigger as-child>
+            <Button variant="outline" :class="cn(
+                'w-[280px] justify-start text-left font-normal',
+                !value && 'text-muted-foreground',
+            )">
+                <CalendarIcon class="mr-2 h-4 w-4" />
+                {{ value ? df.format(value.toDate(getLocalTimeZone())) : "Pick a date" }}
+            </Button>
+        </PopoverTrigger>
+        <PopoverContent class="flex w-auto flex-col gap-y-2 p-2">
+            <Select @update:model-value="(v) => {
+                if (!v) return;
+                value = today(getLocalTimeZone()).add({ days: Number(v) });
+            }">
+                <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem v-for="item in items" :key="item.value" :value="item.value.toString()">
+                        {{ item.label }}
+                    </SelectItem>
+                </SelectContent>
+            </Select>
+            <Calendar v-model="endDate" />
+        </PopoverContent>
+    </Popover>
 
-<style scoped></style>
+    <div>{{ countdown }}-{{ endDate }}</div>
+</template>
