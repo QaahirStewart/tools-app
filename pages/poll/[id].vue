@@ -1,52 +1,100 @@
 <script setup>
-import { RealtimeChannel } from "@supabase/supabase-js";
+// import { RealtimeChannel } from "@supabase/supabase-js";
 
-let realtimeChannel = RealtimeChannel;
+// let realtimeChannel = RealtimeChannel;
 
-onMounted(() => {
-  realtimeChannel = supabase
-    .channel("public:poll_votes")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "poll_votes" },
-      () => refreshVotes(),
-    );
-  realtimeChannel.subscribe();
-});
+// onMounted(() => {
+//   realtimeChannel = supabase
+//     .channel("public:poll_votes")
+//     .on(
+//       "postgres_changes",
+//       { event: "*", schema: "public", table: "poll_votes" },
+//       () => refreshVotes(),
+//     );
+//   realtimeChannel.subscribe();
+// });
 
 const supabase = useSupabaseClient();
 
 const route = useRoute();
-const currentId = route.params.id;
+const currentId = parseInt(route.params.id, 10); // Convert to number
+
+// Poll Data
+
+const { data: poll, refresh } = useFetch("/api/polls", {
+  transform: async (response) => {
+    return response.polls.find((poll) => poll.id === currentId);
+  },
+});
+
+// Vote Data
+
+const { data: rawVoteData, refresh: refreshVotes } = await useAsyncData(
+  "voteData",
+  async () => {
+    const { data } = await supabase
+      .from("poll_votes", { count: "exact" })
+      .select("*")
+      .eq("poll_id", currentId);
+    return data;
+  }
+);
+
+// Transform vote data to group by option_voted, count each, and calculate percentages
+const voteData = computed(() => {
+  const groupedVotes = rawVoteData.value.reduce((acc, vote) => {
+    if (acc[vote.option_voted]) {
+      acc[vote.option_voted]++;
+    } else {
+      acc[vote.option_voted] = 1;
+    }
+    return acc;
+  }, {});
+
+  const totalVotes = Object.values(groupedVotes).reduce(
+    (sum, count) => sum + count,
+    0
+  );
+
+  return Object.entries(groupedVotes).map(([option, count]) => ({
+    option_voted: option,
+    count,
+    percentage:
+      totalVotes > 0 ? ((count / totalVotes) * 100).toFixed(0) + "%" : "0%",
+  }));
+});
+
+// Merge poll data and voteData
+const PollData = computed(() => {
+  if (!poll.value || !voteData.value) {
+    return [];
+  }
+
+  return poll.value.options.map((optionText) => {
+    const voteInfo = voteData.value.find(
+      (vote) => vote.option_voted === optionText
+    ) || { count: 0, percentage: "0%" };
+    return {
+      option: optionText,
+      voteCount: voteInfo.count,
+      votePercentage: voteInfo.percentage,
+    };
+  });
+});
+
+const totalVotes = computed(() => {
+  if (!rawVoteData.value) return 0;
+  return rawVoteData.value.reduce((sum, vote) => sum + 1, 0);
+});
 
 const randomUserID = () => {
   return Math.floor(Math.random() * 1000000);
 };
 
-const { data: pollData } = await useAsyncData("pollData", async () => {
-  const { data } = await supabase
-    .from("polls")
-    .select(
-      `
-            *,
-            poll_options (*),
-            poll_votes!inner(*)
-        `
-    )
-    .eq("id", currentId);
-  return data;
-});
-
-const pollName = computed(() => {
-  if (pollData.value.length > 0) {
-    return pollData.value[0].question;
-  }
-  return "Default Poll Name"; // Fallback name if pollData is empty
-});
-
 const pollDate = computed(() => {
-  if (pollData.value.length > 0) {
-    const date = new Date(pollData.value[0].created_at);
+  if (poll.value && poll.value.created_at) {
+    // Check if poll.value exists and has a created_at property
+    const date = new Date(poll.value.created_at);
     // Format the date as "Month day, year"
     return date.toLocaleDateString("en-US", {
       month: "long",
@@ -55,13 +103,6 @@ const pollDate = computed(() => {
     });
   }
   return "No Date Available";
-});
-
-const options = computed(() => {
-  if (pollData.value.length > 0 && pollData.value[0].poll_options.length > 0) {
-    return pollData.value[0].poll_options[0].options;
-  }
-  return [];
 });
 
 const selectedOption = ref(null);
@@ -90,102 +131,112 @@ const submitVote = async () => {
         updated_at: new Date().toISOString(),
         user_id: randomUserID(),
         poll_id: currentId,
-
       },
     ]);
 
     // Reset the selected option and platform
+    refreshVotes();
     selectedOption.value = null;
     selectedPlatform.value = null;
   }
 };
-
-const { data: voteData, refresh: refreshVotes } = await useAsyncData("voteData", async () => {
-  const { data } = await supabase
-    .from("poll_votes")
-    .select('*')
-    .eq("poll_id", currentId);
-  return data;
-});
-
-
-
-const countOptionVotes = (votes) => {
-  const counts = {};
-  // Ensure votes is treated as an array, even if null or undefined
-  (votes ?? []).forEach(vote => {
-    const { option_voted } = vote;
-    counts[option_voted] = (counts[option_voted] || 0) + 1;
-  });
-  return counts;
-};
-
-// Assuming voteData might not be an array initially
-const optionVoteCounts = countOptionVotes(voteData.value); // Use .value if voteData is a ref
-
-
-const totalvotes = computed(() => {
-  if (voteData.value.length > 0) {
-    return voteData.value.length;
-  }
-  return 0;
-});
-
-const totalVotes = computed(() => {
-  return Object.values(optionVoteCounts).reduce((acc, votes) => acc + votes, 0);
-});
-
-function calculatePercentage(votes) {
-  if (totalVotes.value === 0) return '0.00'; // Avoid division by zero
-  return ((votes / totalVotes.value) * 100).toFixed(0); // Rounds to two decimal places
-}
 </script>
 
 <template>
-  <div class="container mx-auto p-4 h-screen">
-    <div class="flex my-12 items-end space-x-5">
-      <Icon name="fa6-solid:square-poll-vertical" size="60" />
-      <h1 class="text-7xl font-bold text-center">Poll - {{ totalvotes }} </h1>
-    </div>
-    <div class="flex flex-col max-w-xl space-y-4">
-      <div class="flex justify-between">
-        <h1 class="text-lg font-bold">{{ pollName }}</h1>
-        <p>{{ pollDate }}</p>
+  <div class="container mx-auto  overflow-auto ">
+    <div class="flex justify-evenly h-screen flex-col ">
+      <!-- Poll Section -->
+
+      <div class="flex flex-col max-w-xl w-full space-y-4 mx-auto">
+        <NuxtLink to="/polls" class="flex my-4 items-end space-x-5">
+          <Icon name="fa6-solid:square-poll-vertical" size="60" />
+          <h1 class="text-7xl font-bold text-center">Poll</h1>
+        </NuxtLink>
+
+        <div class="flex justify-between">
+          <h1 class="text-lg text-md font-bold">{{ poll.question }}</h1>
+          <p>{{ pollDate }}</p>
+        </div>
+
+        <!-- Poll Options -->
+
+        <div class="space-y-2">
+          <div v-for="(poll, index) in PollData" :key="index" class="w-full bg-black/5 hover:bg-black/10 rounded-lg">
+            <button :class="{ selectedPollOption: selectedOption === poll.option }"
+              @click="selectedOption = poll.option"
+              class="w-full flex items-center justify-between rounded-lg relative">
+              <div :style="{ width: poll.votePercentage }"
+                class="flex items-center h-14 justify-between rounded-lg bg-black/10">
+                <p class="pl-6">{{ poll.option }}</p>
+              </div>
+
+              <p class="absolute right-0 pr-6">{{ poll.votePercentage }}</p>
+            </button>
+          </div>
+        </div>
+
+        <!-- Selected Platform -->
+
+        <div class="flex sm:flex-row flex-col justify-between items-center sm:space-y-0 space-y-4 sm:py-0 py-4">
+          <h2 class="text-lg font-bold">Viewing Platform:</h2>
+          <div class="flex flex-wrap space-x-4">
+            <button v-for="(platform, index) in platforms" :key="index" @click="selectedPlatform = platform.name"
+              :class="{
+            selectedViewingPlatform: selectedPlatform === platform.name,
+          }"
+              class="bg-black/5 hover:bg-black/10  sm:size-14 size-12 rounded-lg flex items-center justify-center space-x-2">
+              <Icon :name="platform.icon" size="24" />
+            </button>
+          </div>
+        </div>
+
+        <button :disabled="!isVoteEnabled" @click="submitVote"
+          class="bg-neutral-800 hover:bg-neutral-900 text-white font-bold h-14 rounded-lg disabled:bg-neutral-600 disabled:cursor-not-allowed">
+          Vote
+        </button>
       </div>
 
-      <!-- Poll Options -->
+      <!-- stats Section -->
+      <div class="max-w-xl w-full  mx-auto flex flex-col jutify-center py-8">
+        <div class=" py-8 rounded-lg bg-black/5 w-full h-full flex flex-col justify-center">
+          <div class="mx-8 space-y-4 ">
+            <div class="flex items-center justify-center space-x-4 pb-2 ">
+              <Icon name="fa6-solid:envelope-open-text" size="30" class="" />
+              <p class="font-bold">Total Votes:&nbsp;{{ totalVotes }}</p>
+            </div>
+            <div class="space-y-2">
+              <div class="flex items-center space-x-4 p-3 bg-black/5 rounded-lg">
+                <Icon name="fa6-solid:trophy" size="30" class="text-yellow-400" />
+                <div class="flex">
+                  <p class="font-bold">Most Voted:&nbsp;</p>
+                  <p>BMW</p>
+                </div>
+              </div>
 
-      <div class="space-y-2">
-        <div v-for="(option, index) in  options " :key="index">
-          <button @click="selectedOption = option"
-            class="w-full flex  py-4 px-6 rounded-lg bg-black/5 hover:bg-black/10 text-start">
-            <p class="w-full">{{ option }}</p>
-            <div v-for="(votes, key, index) in  optionVoteCounts " :key="index" class="flex">
-              <div v-if="key === option"> {{ calculatePercentage(votes) }}%</div>
+              <div class="flex items-center space-x-4 p-3 bg-black/5 rounded-lg">
+                <Icon name="simple-icons:twitch" size="30" class="text-yellow-400" />
+
+                <p class="font-bold">Top Viewing Platform</p>
+              </div>
             </div>
 
-          </button>
 
+
+          </div>
         </div>
       </div>
-
-      <div class="flex justify-between items-center">
-        <h2 class="text-lg font-bold">Viewing Platform:</h2>
-        <div class="flex flex-wrap space-x-4">
-          <button v-for="( platform, index ) in  platforms " :key="index" @click="selectedPlatform = platform.name"
-            :class="{
-        'border-black/25 border-2': selectedPlatform === platform.name,
-      }
-        " class="bg-black/5 hover:bg-black/10 p-4 rounded-lg flex items-center justify-center space-x-2">
-            <Icon :name="platform.icon" size="24" />
-          </button>
-        </div>
-      </div>
-
-      <button :disabled="!isVoteEnabled" @click="submitVote"
-        class="bg-neutral-800 hover:bg-neutral-900 text-white font-bold py-4 px-4 rounded-lg disabled:bg-neutral-600 disabled:cursor-not-allowed">
-        Vote
-      </button>
     </div>
   </div>
 </template>
+
+<style scoped>
+.selectedPollOption {
+  background-color: rgb(34 197 94 / 0.75);
+}
+
+.selectedViewingPlatform {
+  border-width: 3px;
+  border-color: rgb(0 0 0 / 0.1);
+  background: rgb(0 0 0 / 0.15);
+}
+</style>

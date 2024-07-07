@@ -1,14 +1,9 @@
 <script setup>
-const supabase = useSupabaseClient();
 
-const route = useRoute()
-const currentId = route.params.id;
-
-const { data: pollData } = await useAsyncData("pollData", async () => {
-    const { data } = await supabase
-        .from("polls")
-        .select("*")
-    return data;
+const { data: polls, refresh } = useFetch("/api/polls", {
+    transform: async (response) => {
+        return response.polls.map((poll) => poll);
+    },
 });
 </script>
 
@@ -37,7 +32,7 @@ const { data: pollData } = await useAsyncData("pollData", async () => {
         <div class="bg-gray-100 p-4 rounded-lg max-w-2xl mt-4 space-y-4 py-8">
             <h2 class="font-bold text-center text-2xl">History</h2>
             <div class="mx-4 space-y-2">
-                <div v-for="(poll, index) in pollData" :key="index"
+                <div v-for="(poll, index) in polls" :key="index"
                     class="flex justify-between items-center  bg-black/5 hover:bg-black/15 py-4 pr-2 pl-6 rounded-lg">
                     <h1>{{ poll.question }}</h1>
                     <div>
