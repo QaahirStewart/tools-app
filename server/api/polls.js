@@ -1,5 +1,4 @@
 import { serverSupabaseClient } from "#supabase/server";
-import { serverSupabaseUser } from "#supabase/server";
 
 export default eventHandler(async (event) => {
   try {

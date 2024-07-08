@@ -228,12 +228,12 @@ const topViewingPlatform = computed(() => {
                 <p class="font-bold">Top Viewing Platform</p>
               </div>
             </div>
-
-
-
           </div>
         </div>
       </div>
+
+      {{ rawVoteData }}
+
     </div>
   </div>
 </template>
