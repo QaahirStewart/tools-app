@@ -4,19 +4,19 @@ export default eventHandler(async (event) => {
   try {
     const client = await serverSupabaseClient(event);
 
-    const id = getRouterParam(event, "id");
+    const pollid = getRouterParam(event, "id");
 
-    const { data: pollData, pollsDataError } = await client
+    const { data: poll, pollDataError } = await client
       .from("polls")
       .select("*")
-      .eq("id", id);
+      .eq("id", pollid);
 
-    if (pollsDataError) {
-      throw pollsDataError;
+    if (pollDataError) {
+      throw pollDataError;
     }
 
     return {
-      pollData,
+      poll,
     };
   } catch (error) {
     console.error("Error fetching polls:", error.message);
