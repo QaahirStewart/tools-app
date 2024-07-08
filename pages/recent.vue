@@ -1,13 +1,13 @@
 <script setup>
 
-const currentId = ref('');
-const { data: polls, refresh } = useFetch("/api/polls");
+const id = ref('2');
+const { data: poll, refresh } = useFetch(`/api/poll/${id.value}`);
 
 </script>
 
 <template>
     <div>
-        {{ polls }}
+        {{ poll }}
     </div>
 </template>
 
